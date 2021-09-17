@@ -4,12 +4,12 @@ local SongSelector = require(script.Parent.SongSelector)
 
 
 
---map of Players by their uuid
+-- map of Players by their uuid
 local playersByUUID = {};
---map of player's associated PlayerBeat object.
+-- map of player's associated PlayerBeat object.
 local playerBeats = {}
 
---active song playing. 
+-- active song playing. 
 local currentSong = nil
 
 
@@ -17,11 +17,11 @@ local currentSong = nil
 local DanceManager = {}
 --[[ Begins tracking a player as dancing, as well as beginning a song if this player is the first to begin dancing ]]
 function DanceManager.playerStartDancing(player: Player)
-	--not playing a song, create one.
+	-- not playing a song, create one.
 	if currentSong == nil then
 		DanceManager.newSong()
 	end
-	--player is added to the table after creating the new song if none, so they're not sent a SongChanged event
+	-- player is added to the table after creating the new song if none, so they're not sent a SongChanged event
 	playersByUUID[player.UserId] = player
 	Shared.remotes.PlayerJoinDance:FireClient(player, currentSong.chart.name, currentSong.difficulty, currentSong:getTick())
 end

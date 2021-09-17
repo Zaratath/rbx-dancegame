@@ -5,7 +5,7 @@ local difficulties = {
 	["Expert"] = 4
 }
 
---to make it immutable
+-- to make it immutable
 return setmetatable({}, {
 	__index = function(_, k) 
 		return difficulties[k]

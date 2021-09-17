@@ -25,11 +25,26 @@ function PlayerBeats.new(song, startTick)
 	end
 
 	print("PlayerBeat initialized.", startTick, beats)
-
+	pb.song = song
 	pb.beats = beats
 	return setmetatable(pb, PlayerBeats)
 end
 
+--[[ Should only be called on the clientside: removes notes that have expired in the Song
+	@returns the amount of notes missed.
+]]
+function PlayerBeats:missExpiredNotes(): number
+	local i = 0
+	for _,chord in ipairs(self.beats) do
+		for j,beat in ipairs(chord) do
+			if beat.TimePosition < (self.song:getTick() - ACC_THRESHOLD[1]) then
+				table.remove(chord, j)
+				i += 1
+			end
+		end
+	end
+	return i
+end
 
 function checkNoteRanges(notePos, hit, hitrange:number) 
 	return notePos < (hit.timePos + ACC_THRESHOLD[hitrange])  or notePos > (hit.timePos - ACC_THRESHOLD[hitrange])

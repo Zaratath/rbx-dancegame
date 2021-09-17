@@ -9,7 +9,7 @@ local AUDIO_NAME = "sound"
 local ChartsByName = {}
 local AudioByName = {}
 
---Indexing and parsing songs.
+-- Indexing and parsing songs.
 for _,songDir in pairs(songsDir:GetChildren()) do
 	local module = songDir:FindFirstChild(CHARTSTRING_NAME);
 	local audio = songDir:FindFirstChild(AUDIO_NAME);
@@ -27,9 +27,7 @@ end
 
 local Charts = {}
 
---[[
-	@returns Song by index. Nil if no song exists at that index.
-]]
+--[[ @returns Chart by index. Nil if no song exists at that index ]]
 function Charts.getChartByName(name: string) 
 	return ChartsByName[name]
 end
