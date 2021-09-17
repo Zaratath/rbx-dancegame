@@ -1,0 +1,798 @@
+<!-- 
+	MIT License
+
+Copyright (c) 2021 Cam
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+<roblox version="4">
+  <Item class="ModuleScript" referent="0">
+    <Properties>
+      <string name="Name">Chart</string>
+      <string name="Source"><![CDATA[local ParseChartData = require(script.ParseChartData)
+local Symbol = require(script.Symbol)
+
+local ERR_CAT_MISSING = "Unable to process chart data: missing category %q"
+local ERR_FIELD_MISSING = "Unable to process chart data: missing key %q in category %q"
+
+local fmt = string.format
+
+local Chart = {}
+
+Chart.__index = Chart
+Chart.__symbol = Symbol.new("Chart")
+
+function Chart.new(chart: string, maxChords: number)
+    local self = setmetatable({}, Chart)
+
+    local chartData = ParseChartData.parse(chart, maxChords)
+    self:_populateWithChartData(chartData)
+
+    return self
+end
+
+function Chart:_populateWithChartData(chartData)
+    local difficulties = {}
+
+    for key, values in pairs(chartData) do
+        if key == "Song" then
+            local resolution = assert(values.Resolution, fmt(ERR_FIELD_MISSING, "Resolution", "Song"))
+
+            if resolution then
+                self.Resolution = tonumber(resolution)
+            end
+        elseif key == "SyncTrack" then
+            self.BPM = {
+                string.match(assert(values["0"], fmt(ERR_FIELD_MISSING, "0", "SyncTrack")), "%d+") / 1000,
+            }
+        elseif ParseChartData.getDifficulty(key) ~= nil then
+            local difficulty = ParseChartData.getDifficulty(key)
+            difficulties[difficulty] = values
+        end
+    end
+
+    assert(self.Resolution, fmt(ERR_CAT_MISSING, "Song"))
+    assert(self.BPM, fmt(ERR_CAT_MISSING, "SyncTrack"))
+
+    if not (difficulties.Easy or difficulties.Medium or difficulties.Hard or difficulties.Expert) then
+        error(fmt(ERR_CAT_MISSING, "one of <EasyXXX | MediumXXX | HardXXX | ExpertXXX>"), 2)
+    end
+
+    local difficultyArrays = {}
+    local finalNote = 0
+
+    for difficulty, values in pairs(difficulties) do
+        local difficultyArray = {}
+
+        for key, value in pairs(values) do
+            local beatsRelative = tonumber(key)
+            local beat = beatsRelative / self.Resolution
+
+            local currentNote = {
+                BeatRelative = beatsRelative,
+                Beat = beat,
+                TimePosition = (beat / self.BPM[1]) * 60,
+                Sustain = value.Sustain and {
+                    LengthRelative = value.Sustain,
+                    LengthBeats = value.Sustain / self.Resolution,
+                    TimeLength = ((value.Sustain / self.Resolution) / self.BPM[1]) * 60,
+                },
+                Chord = value.Chord,
+            }
+
+            table.insert(difficultyArray, currentNote)
+
+            local noteEnd = currentNote.TimePosition + (currentNote.Sustain and currentNote.Sustain.TimeLength or 0)
+
+            if finalNote < noteEnd then
+                finalNote = noteEnd
+            end
+        end
+
+        table.sort(difficultyArray, function(a, b)
+            return a.Beat < b.Beat
+        end)
+
+        difficultyArrays[difficulty] = difficultyArray
+    end
+
+    self.Difficulty = difficultyArrays
+    self.MaxDuration = finalNote
+end
+
+function Chart.is(object: any): boolean
+    return type(object) == "table" and (Symbol.is(object.__symbol) and object.__symbol == Chart.__symbol)
+end
+
+return Chart
+]]></string>
+    </Properties>
+    <Item class="ModuleScript" referent="1">
+      <Properties>
+        <string name="Name">Dictionary</string>
+        <string name="Source"><![CDATA[return {
+    map = require(script.map),
+}
+]]></string>
+      </Properties>
+      <Item class="ModuleScript" referent="2">
+        <Properties>
+          <string name="Name">map</string>
+          <string name="Source"><![CDATA[--!strict
+--[[
+    Replaces each entry with the result of `callback`
+]]
+type Dictionary<Key, Value> = ({ [Key]: Value })
+
+local fmt = string.format
+local ERR_TYPE = "map expected %q (argument #%d) to be of type %s, but got %q (%s)"
+
+local function map(
+    dictionary: Dictionary<any, any>,
+    callback: (any, any?) -> any
+): Dictionary<any, any>
+    assert(type(dictionary) == "table", fmt(ERR_TYPE, "dictionary", 1, "table", tostring(dictionary), typeof(dictionary)))
+    assert(type(callback) == "function", fmt(ERR_TYPE, "callback", 2, "function", tostring(callback), typeof(callback)))
+
+    local new = {}
+
+    for key, value in pairs(dictionary) do
+        new[key] = callback(value, key)
+    end
+
+    return new
+end
+
+return map
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="3">
+        <Properties>
+          <string name="Name">map.spec</string>
+          <string name="Source"><![CDATA[return function()
+    local map = require(script.Parent.map)
+
+    local dictionary = {
+        promised = 10,
+        fun = 20,
+        thick = 30,
+        cake = 40,
+        ride = 50,
+    }
+
+    it("updates values in an dictionary", function()
+        local new = map(dictionary, function(value)
+            return value + 5
+        end)
+
+        expect(new).to.be.ok()
+
+        expect(new.promised).to.equal(15)
+        expect(new.cake).to.equal(45)
+    end)
+
+    it("does not overwrite the original dictionary", function()
+        local new = map(dictionary, function(value)
+            return value + 1
+        end)
+
+        expect(new).to.be.ok()
+        expect(new).never.to.equal(dictionary)
+    end)
+
+    it("throws if dictionary is not a table", function()
+        expect(pcall(map, Color3.new())).to.equal(false)
+    end)
+
+    it("throws if callback is not a function", function()
+        expect(pcall(map, {}, game)).to.equal(false)
+    end)
+end
+]]></string>
+        </Properties>
+      </Item>
+    </Item>
+    <Item class="ModuleScript" referent="4">
+      <Properties>
+        <string name="Name">List</string>
+        <string name="Source"><![CDATA[return {
+    filter = require(script.filter),
+    map = require(script.map),
+    toDictionary = require(script.toDictionary),
+}
+]]></string>
+      </Properties>
+      <Item class="ModuleScript" referent="5">
+        <Properties>
+          <string name="Name">filter</string>
+          <string name="Source"><![CDATA[--!strict
+--[[
+    Filters an array by calling `predicate` on each entry.
+
+    If predicate returns true, the entry will be added to the new array.
+    If predicate returns false, the entry will be removed from the new array.
+]]
+type Array<T> = ({ [number]: T })
+
+local fmt = string.format
+local ERR_TYPE = "filter expected %q (argument #%d) to be of type %s, but got %q (%s)"
+
+local function filter(
+    list: Array<any>,
+    predicate: (any, number?) -> boolean
+): Array<any>
+    assert(type(list) == "table", fmt(ERR_TYPE, "list", 1, "table", tostring(list), typeof(list)))
+    assert(type(predicate) == "function", fmt(ERR_TYPE, "predicate", 2, "function", tostring(predicate), typeof(predicate)))
+
+    local new = {}
+
+    for index, value in ipairs(list) do
+        if predicate(value, index) == true then
+            table.insert(new, value)
+        end
+    end
+
+    return new
+end
+
+return filter
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="6">
+        <Properties>
+          <string name="Name">filter.spec</string>
+          <string name="Source"><![CDATA[return function()
+    local filter = require(script.Parent.filter)
+    local array = { "water", "nervous", "box", "independent", "subject" }
+
+    it("removes items from an array", function()
+        local new = filter(array, function(entry)
+            return #entry <= 5
+        end)
+
+        expect(new).to.be.ok()
+        expect(#new).to.equal(2)
+    end)
+
+    it("preseves the order of entries", function()
+        local new = filter(array, function(entry)
+            return #entry > 3
+        end)
+
+        expect(new).to.be.ok()
+        expect(#new).to.equal(4)
+
+        expect(new[1]).to.equal("water")
+        expect(new[2]).to.equal("nervous")
+        expect(new[3]).to.equal("independent")
+    end)
+
+    it("does not overwrite the original array", function()
+        local new = filter(array, function(value)
+            return #value > 0
+        end)
+
+        expect(new).to.be.ok()
+        expect(new).never.to.equal(array)
+    end)
+
+    it("throws if array is not a table", function()
+        expect(pcall(filter, Color3.new())).to.equal(false)
+    end)
+
+    it("throws if predicate is not a function", function()
+        expect(pcall(filter, {}, game)).to.equal(false)
+    end)
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="7">
+        <Properties>
+          <string name="Name">map</string>
+          <string name="Source"><![CDATA[--!strict
+--[[
+    Replaces each entry with the result of `callback`
+]]
+type Array<T> = ({ [number]: T })
+
+local fmt = string.format
+local ERR_TYPE = "map expected %q (argument #%d) to be of type %s, but got %q (%s)"
+
+local function map(
+    list: Array<any>,
+    callback: (any, number?) -> any
+): Array<any>
+    assert(type(list) == "table", fmt(ERR_TYPE, "list", 1, "table", tostring(list), typeof(list)))
+    assert(type(callback) == "function", fmt(ERR_TYPE, "callback", 2, "function", tostring(callback), typeof(callback)))
+
+    local new = {}
+
+    for index, value in ipairs(list) do
+        new[index] = callback(value, index)
+    end
+
+    return new
+end
+
+return map
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="8">
+        <Properties>
+          <string name="Name">map.spec</string>
+          <string name="Source"><![CDATA[return function()
+    local map = require(script.Parent.map)
+    local array = { 10, 20, 30, 40, 50 }
+
+    it("updates values in an array", function()
+        local new = map(array, function(value)
+            return value + 5
+        end)
+
+        expect(new).to.be.ok()
+        expect(new[1]).to.equal(15)
+    end)
+
+    it("preserves the order of entries", function()
+        local new = map(array, function(value)
+            return value + 10
+        end)
+
+        expect(new).to.be.ok()
+        expect(#new).to.equal(#array)
+
+        expect(new[1]).to.equal(array[1] + 10)
+        expect(new[2]).to.equal(array[2] + 10)
+        expect(new[3]).to.equal(array[3] + 10)
+    end)
+
+    it("does not overwrite the original array", function()
+        local new = map(array, function(value)
+            return value + 1
+        end)
+
+        expect(new).to.be.ok()
+        expect(new).never.to.equal(array)
+    end)
+
+    it("throws if array is not a table", function()
+        expect(pcall(map, Color3.new())).to.equal(false)
+    end)
+
+    it("throws if callback is not a function", function()
+        expect(pcall(map, {}, game)).to.equal(false)
+    end)
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="9">
+        <Properties>
+          <string name="Name">toDictionary</string>
+          <string name="Source"><![CDATA[--!strict
+--[[
+    Converts an Array of Arrays to a Dictionary, where sub-Arrays
+    are key-value pairs; ex. `{{ "key", "value" }, { "key2", "value2" }}`
+]]
+type Dictionary<Key, Value> = ({ [Key]: Value })
+type Array<T> = (Dictionary<number, T>)
+
+local fmt = string.format
+local ERR_TYPE = "toDictionary expected %q (argument #%d) to be of type %s, but got %q (%s)"
+
+local function toDictionary(list: Array<Array<any>>): Dictionary<any, any>
+    assert(type(list) == "table", fmt(ERR_TYPE, "list", 1, "table", tostring(list), typeof(list)))
+
+    local new = {}
+
+    for _, value in ipairs(list) do
+        if type(value) ~= "table" then
+            continue
+        end
+
+        new[value[1]] = value[2]
+    end
+
+    return new
+end
+
+return toDictionary
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="10">
+        <Properties>
+          <string name="Name">toDictionary.spec</string>
+          <string name="Source"><![CDATA[return function()
+    local toDictionary = require(script.Parent.toDictionary)
+
+    local array = {
+        { "signal", "spin" },
+        { "loss", "gentle" },
+        { "lesson", "charge" },
+        { "pen", "then" },
+        { "zoo", "season" },
+    }
+
+    it("converts array pairs to a dictionary", function()
+        local new = toDictionary(array)
+
+        expect(new).to.be.ok()
+        expect(#new).to.equal(0)
+        expect(new.signal).to.equal("spin")
+    end)
+
+    it("does not overwrite the original array", function()
+        local new = toDictionary(array)
+
+        expect(new).to.be.ok()
+        expect(new).never.to.equal(array)
+    end)
+
+    it("throws if array is not a table", function()
+        expect(pcall(toDictionary, Color3.new())).to.equal(false)
+    end)
+
+    it("skips non-table entries", function()
+        local new = toDictionary({
+            { "manufacturing", "half" },
+            true,
+            { "travel", "family" }
+        })
+
+        expect(new).to.be.ok()
+        expect(new.travel).to.equal("family")
+    end)
+
+    it("throws if \"key\" (`entry[1]`) is nil", function()
+        local testArray = {
+            { "across", "bridge" },
+            { "mission", nil },
+            { nil, "cabin" },
+        }
+
+        expect(pcall(toDictionary, testArray)).to.equal(false)
+    end)
+end
+]]></string>
+        </Properties>
+      </Item>
+    </Item>
+    <Item class="ModuleScript" referent="11">
+      <Properties>
+        <string name="Name">ParseChartData</string>
+        <string name="Source"><![CDATA[--!strict
+--[[
+    Parses string data from `.chart` files and returns its
+    data as a Dictionary (where category headers are keys)
+]]
+
+local Dictionary = require(script.Parent.Dictionary)
+local String = require(script.Parent.String)
+local List = require(script.Parent.List)
+
+local ERR_TYPE_NOTES = "Error parsing notes: Value at position #%d should be of type %s, but got %q (%s)"
+
+local fmt = string.format
+local match = string.match
+local split = string.split
+local find = string.find
+local gsub = string.gsub
+
+local clamp = math.clamp
+local floor = math.floor
+
+local function getDifficulty(value: string): string?
+    if match(value, "Easy%w+") then
+        return "Easy"
+    elseif match(value, "Medium%w+") then
+        return "Medium"
+    elseif match(value, "Hard%w+") then
+        return "Hard"
+    elseif match(value, "Expert%w+") then
+        return "Expert"
+    end
+end
+
+local function ParseChartData(chart: string, maxChords: number?)
+    local categories = split(chart, "[")
+    local chartData = {}
+
+    if type(maxChords) ~= "number" then
+        maxChords = 4
+    end
+
+    for _, category in ipairs(categories) do
+        local categoryTitle = match(category, "%w+")
+        local categoryData: any = match(category, "%b{}")
+
+        if not categoryData then
+            continue
+        end
+
+        categoryData = split(categoryData, "\n")
+
+        categoryData = List.filter(categoryData, function(value)
+            return find(value, "=", 0, true) ~= nil
+        end)
+
+        categoryData = List.map(categoryData, function(entry)
+            local data = List.map(split(entry, "="), function(value)
+                local trimmed = String.trim(value)
+                local normalised = trimmed
+
+                if match(normalised, "%b\"\"") then
+                    normalised = gsub(normalised, "\"", "")
+                end
+
+                return normalised
+            end)
+
+            data = List.filter(data, function(value)
+                return #value > 0
+            end)
+
+            return data
+        end)
+
+        if categoryTitle == "SyncTrack" then
+            categoryData = List.filter(categoryData, function(entry)
+                return match(tostring(entry[2]), "B %d+") ~= nil
+            end)
+        end
+
+        categoryData = List.toDictionary(categoryData)
+
+        if getDifficulty(categoryTitle) ~= nil then
+            categoryData = Dictionary.map(categoryData, function(value)
+                local values = split(value, " ")
+
+                values[2] = tonumber(values[2])
+                values[3] = tonumber(values[3])
+
+                assert(type(values[2]) == "number", fmt(ERR_TYPE_NOTES, 2, "number", tostring(values[2]), typeof(values[2])))
+                assert(type(values[3]) == "number", fmt(ERR_TYPE_NOTES, 3, "number", tostring(values[3]), typeof(values[3])))
+
+                -- Sustain would usually be represented by "N" or "S" in values[1]; however,
+                -- it's safe to assume that if length is greater than 0, then the player is
+                -- expected to hold the button (chord), rather than tap
+
+                -- Chords can be higher than `maxChords` on instruments such as Drums, but we only want
+                -- `maxChords` buttons max., so we'll perform a modulus operation on the chord to ensure
+                -- that it keeps it within our requirements (NB. `maxChords` is "4" by default)
+
+                return {
+                    Sustain = values[3] > 0 and values[3] or nil,
+                    Chord = clamp(floor((values[2] + 1) % (maxChords + 1)), 1, maxChords),
+                }
+            end)
+        end
+
+        chartData[categoryTitle] = categoryData
+    end
+
+    return chartData
+end
+
+return {
+    parse = ParseChartData,
+    getDifficulty = getDifficulty,
+}
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="ModuleScript" referent="12">
+      <Properties>
+        <string name="Name">ParseChartData.spec</string>
+        <string name="Source"><![CDATA[local ServerScripts = game:GetService("ServerScriptService")
+
+return function()
+    local Parser = require(script.Parent.ParseChartData)
+    local chartString = require(ServerScripts["sample.chart"])
+
+    it("parses .chart strings", function()
+        local chartData = Parser.parse(chartString)
+
+        expect(chartData).to.be.ok()
+        expect(chartData).to.be.a("table")
+
+        expect(chartData.Song).to.be.ok()
+        expect(chartData.EasySingle).to.be.ok()
+    end)
+
+    it("parses note data", function()
+        local chartData = Parser.parse(chartString)
+
+        expect(chartData).to.be.ok()
+
+        expect(chartData.EasySingle).to.be.a("table")
+        expect(chartData.EasySingle["192"]).to.be.a("table")
+        expect(chartData.EasySingle["192"].Chord).to.equal(2)
+    end)
+
+    it("identifies difficulty from string", function()
+        expect(Parser.getDifficulty("HardDrums")).to.equal("Hard")
+    end)
+end
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="ModuleScript" referent="13">
+      <Properties>
+        <string name="Name">String</string>
+        <string name="Source"><![CDATA[return {
+    trim = require(script.trim),
+}
+]]></string>
+      </Properties>
+      <Item class="ModuleScript" referent="14">
+        <Properties>
+          <string name="Name">trim</string>
+          <string name="Source"><![CDATA[--[[
+    Removes whitespace from the beginning and end of strings
+]]
+
+local fmt = string.format
+local gsub = string.gsub
+
+local ERR_TYPE = "trim expected %q (argument #%d) to be of type %s, but got %q (%s)"
+
+local function trim(value: string): string
+    assert(type(value) == "string", fmt(ERR_TYPE, "value", 1, "string", tostring(value), typeof(value)))
+
+    return gsub(value, "^%s*(.-)%s*$", "%1")
+end
+
+return trim
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="15">
+        <Properties>
+          <string name="Name">trim.spec</string>
+          <string name="Source"><![CDATA[return function()
+    local trim = require(script.Parent.trim)
+
+    local spacesStart = "    roblox"
+    local spacesEnd = "roblox    "
+    local spacesBoth = "    roblox    "
+    local tabsStart = "\troblox"
+
+    it("removes whitespace from a string", function()
+        expect(trim(spacesStart)).to.equal("roblox")
+        expect(trim(spacesEnd)).to.equal("roblox")
+        expect(trim(spacesBoth)).to.equal("roblox")
+        expect(trim(tabsStart)).to.equal("roblox")
+    end)
+
+    it("throws if `value` is not a string", function()
+        expect(pcall(trim, true)).to.equal(false)
+    end)
+end
+]]></string>
+        </Properties>
+      </Item>
+    </Item>
+    <Item class="ModuleScript" referent="16">
+      <Properties>
+        <string name="Name">Symbol</string>
+        <string name="Source"><![CDATA[local Symbol = {}
+
+Symbol.__index = Symbol
+
+function Symbol.new(name: string): Symbol
+    assert(type(name) == "string", "Symbol name must be a string")
+
+    local self = setmetatable({}, Symbol)
+
+    self.Name = name
+    self.ClassName = "Symbol"
+
+    return self
+end
+
+function Symbol.is(object: any): boolean
+    return type(object) == "table" and getmetatable(object) == Symbol
+end
+
+function Symbol:__tostring()
+    return string.format("Symbol<%s>", self.Name)
+end
+
+return Symbol
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="ModuleScript" referent="17">
+      <Properties>
+        <string name="Name">Symbol.spec</string>
+        <string name="Source"><![CDATA[return function()
+    local Symbol = require(script.Parent.Symbol)
+
+    it("creates a new Symbol object", function()
+        local symbol = Symbol.new("test")
+
+        expect(symbol).to.be.ok()
+    end)
+
+    it("identifies Symbols with Symbol.is", function()
+        local symbol = Symbol.new("test")
+
+        expect(symbol).to.be.ok()
+
+        expect(Symbol.is(symbol)).to.equal(true)
+        expect(Symbol.is(123)).to.equal(false)
+    end)
+
+    it("throws if Symbol name is not a string", function()
+        expect(pcall(Symbol.new)).to.equal(false)
+    end)
+end
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="ModuleScript" referent="18">
+      <Properties>
+        <string name="Name">init.spec</string>
+        <string name="Source"><![CDATA[local ServerScripts = game:GetService("ServerScriptService")
+local SampleChart = require(ServerScripts["sample.chart"])
+
+return function()
+    local Chart = require(script.Parent)
+
+    it("creates a Chart instance from data", function()
+        local chart = Chart.new(SampleChart)
+
+        expect(chart).to.be.ok()
+        expect(Chart.is(chart)).to.equal(true)
+    end)
+
+    describe("Chart instance", function()
+        local chart = Chart.new(SampleChart)
+
+        it("calculates BPM and MaxDuration", function()
+            expect(chart.MaxDuration).to.be.near(63.125, .001)
+            expect(chart.BPM[1]).to.equal(120)
+        end)
+
+        it("calculates timings for each note and maintains order", function()
+            local easyNotes = chart.Difficulty.Easy
+
+            expect(easyNotes).to.be.a("table")
+            expect(easyNotes[1]).to.be.a("table")
+
+            expect(easyNotes[1].Beat).to.equal(1)
+            expect(easyNotes[1].Chord).to.equal(2)
+            expect(easyNotes[1].TimePosition).to.be.near(.5, .001)
+        end)
+
+        it("can be identified as a chart instance", function()
+            expect(Chart.is(chart)).to.equal(true)
+        end)
+    end)
+end
+]]></string>
+      </Properties>
+    </Item>
+  </Item>
+</roblox>

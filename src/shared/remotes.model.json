@@ -1,0 +1,22 @@
+{
+    "Name": "remotes",
+    "ClassName": "Folder",
+    "Children": [
+        {
+            "Name": "PlayerJoinDance",
+            "ClassName": "RemoteEvent"
+        },
+		{
+			"Name": "PlayerLeaveDance",
+			"ClassName": "RemoteEvent"
+		},
+		{
+			"Name": "SongChanged",
+			"ClassName": "RemoteEvent"
+		},
+		{
+			"Name": "PlayerHit",
+			"ClassName": "RemoteEvent"
+		}
+    ]
+}

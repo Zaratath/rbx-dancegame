@@ -1,0 +1,9 @@
+# Project place file
+/rbx-dancegame.rbxlx
+
+# Roblox Studio lock files
+/*.rbxlx.lock
+/*.rbxl.lock
+
+/roblox.toml
+Roact
