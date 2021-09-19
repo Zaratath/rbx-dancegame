@@ -1,8 +1,8 @@
 local ACC_POP_TEXT = {"Miss","Good","Great","Perfect!"}
 local ACC_POP_COLOR = {Color3.new(0.9, 0.3, 0.3),
-						Color3.new(1, 0.9, 0.1),
-						Color3.new(0.4, 0.9, 0.5),
-						Color3.new(0.3, 0.5, 1)}
+				Color3.new(1, 0.9, 0.1),
+				Color3.new(0.4, 0.9, 0.5),
+				Color3.new(0.3, 0.5, 1)}
 -- time in seconds the pop lasts
 local EXPIRY_TIME = 1
 -- pixels to move up.

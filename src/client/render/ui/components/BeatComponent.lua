@@ -1,5 +1,5 @@
 -- defines the speed at which notes approach visually (in seconds)
-local APPROACH_TIME = 8 
+local APPROACH_TIME = 4
 -- left, down, up, right
 local CHORD_ROTA = {90, 0, 180, 270}
 local assetid = "http://www.roblox.com/asset/?id=1687470215"
