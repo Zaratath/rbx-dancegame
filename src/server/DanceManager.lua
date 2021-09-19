@@ -54,10 +54,10 @@ function DanceManager.getCurrentSong()
 	return currentSong
 end
 
---[[ Stops the current song and resets player beat data. Nothing if there's no current song. ]]
+--[[ Drops reference to the current song and resets player beat data. ]]
 function DanceManager.stopSong() 
 	currentSong = nil
-
+	playerBeats = {}
 end
 
 --[[ Begins playing a new song. Chart and difficulty selected within SongSelector ]]
@@ -67,6 +67,7 @@ function DanceManager.newSong()
 
 	currentSong = Song.new(chart, difficulty)
 	for _,player in pairs(playersByUUID) do
+		playerBeats[player.UserId] = PlayerBeats.new(currentSong, currentSong:getTick())
 		Shared.remotes.SongChanged:FireClient(player, chart.name, difficulty, 0)
 	end
 end
