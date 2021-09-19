@@ -1,10 +1,9 @@
 local Hit = {}
 
 function Hit.new(timePos:number, chord:number)
-	print(timePos, chord)
 	local hit = {}
-	hit.timePos = timePos
-	hit.chord = chord
+	hit.TimePos = timePos
+	hit.Chord = chord
 	return hit
 end
 

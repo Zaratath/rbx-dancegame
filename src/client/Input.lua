@@ -12,7 +12,7 @@ local KEYS = {
 --[[ Binds input and generates the hit keys. ]]
 function Input.bind(callback)
 	for i=1,CHORDS do
-		CAS:BindAction(i, callback, true, KEYS[i])
+		CAS:BindAction(i, callback, false, KEYS[i])
 	end
 end
 --[[ Unbinds input, removing hit keys. ]]

@@ -1,33 +1,48 @@
 local Shared = game.ReplicatedStorage.Common
 local Song = require(Shared.music.Song)
 local SongSelector = require(script.Parent.SongSelector)
-
-
+local PlayerBeats = require(Shared.music.PlayerBeats)
+local AnimationManager = require(script.Parent.AnimationManager)
 
 -- map of Players by their uuid
 local playersByUUID = {};
--- map of player's associated PlayerBeat object.
+-- map of playerBeats objects
 local playerBeats = {}
 
 -- active song playing. 
 local currentSong = nil
 
-
-
 local DanceManager = {}
+
+--[[ Removes a note from the player's playerBeats object. Handles fumbling on 0 acc hits. 
+	@returns the removed note ]]
+function DanceManager.playerHitNote(player, chord, acc)
+	if acc == 0 then
+		AnimationManager.fumble(player)
+	end
+	local playerBeat = playerBeats[player.UserId]
+	if not playerBeat then return end
+	return playerBeat:removeBeat(chord)
+end
+
 --[[ Begins tracking a player as dancing, as well as beginning a song if this player is the first to begin dancing ]]
 function DanceManager.playerStartDancing(player: Player)
 	-- not playing a song, create one.
 	if currentSong == nil then
 		DanceManager.newSong()
 	end
+
 	-- player is added to the table after creating the new song if none, so they're not sent a SongChanged event
+	AnimationManager.startDance(player)
 	playersByUUID[player.UserId] = player
+	playerBeats[player.UserId] = PlayerBeats.new(currentSong, currentSong:getTick())
 	Shared.remotes.PlayerJoinDance:FireClient(player, currentSong.chart.name, currentSong.difficulty, currentSong:getTick())
 end
---[[ Stops tracking a player as dancing, and deletes their beat data. ]]
+--[[ Stops tracking a player as dancing, and empties their beat data. ]]
 function DanceManager.playerStopDancing(player: Player)
+	AnimationManager.stopDance(player)
 	playersByUUID[player.UserId] = nil
+	playerBeats[player.UserId] = nil
 	Shared.remotes.PlayerLeaveDance:FireClient(player)
 end
 
@@ -52,7 +67,7 @@ function DanceManager.newSong()
 
 	currentSong = Song.new(chart, difficulty)
 	for _,player in pairs(playersByUUID) do
-		Shared.remotes.SongChanged:FireClient(player, chart.name, difficulty)
+		Shared.remotes.SongChanged:FireClient(player, chart.name, difficulty, 0)
 	end
 end
 

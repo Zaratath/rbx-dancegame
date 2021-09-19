@@ -13,7 +13,7 @@ function Song.new(chart, difficulty, startTick)
 	song.chart = chart
 	song.difficulty = difficulty
 	song._tick = startTick or 0
-	print("Song new", chart, difficulty)
+	print("New song", chart, difficulty)
 
 	return setmetatable(song, Song)
 end
